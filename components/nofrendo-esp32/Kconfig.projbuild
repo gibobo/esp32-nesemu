@@ -2,7 +2,7 @@ menu "Nofrendo ESP32-specific configuration"
 
 choice NOFRENDO_HARDWARE
 	prompt "Hardware to run on"
-	default HW_CUSTOM
+	default ESP_WROVER_KIT_V2_ILI
 	help
 		This emulator can run on various types of hardware. Select what you have here.
 

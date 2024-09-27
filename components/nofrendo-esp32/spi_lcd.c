@@ -24,7 +24,7 @@
 #include "soc/spi_reg.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "driver/periph_ctrl.h"
+#include "esp_private/periph_ctrl.h"
 #include "spi_lcd.h"
 
 #define PIN_NUM_MISO CONFIG_HW_LCD_MISO_GPIO
