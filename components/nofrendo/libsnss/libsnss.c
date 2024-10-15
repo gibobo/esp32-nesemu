@@ -68,7 +68,7 @@ SNSS_ReadBlockHeader (SnssBlockHeader *header, SNSS_FILE *snssFile)
       return SNSS_READ_FAILED;
    }
 
-   strncpy (header->tag, &headerBytes[0], TAG_LENGTH);
+   memcpy(header->tag, &headerBytes[0], TAG_LENGTH);
    header->tag[4] = '\0';
    header->blockVersion = *((unsigned int *) &headerBytes[4]);
    header->blockVersion = swap32 (header->blockVersion);
@@ -86,7 +86,7 @@ SNSS_WriteBlockHeader (SnssBlockHeader *header, SNSS_FILE *snssFile)
    char headerBytes[12];
    unsigned int tempInt;
 
-   strncpy (&headerBytes[0], header->tag, TAG_LENGTH);
+   memcpy(&headerBytes[0], header->tag, TAG_LENGTH);
 
    tempInt = swap32 (header->blockVersion);
    headerBytes[4] = ((char *) &tempInt)[0];
@@ -182,7 +182,7 @@ SNSS_WriteFileHeader (SNSS_FILE *snssFile)
    char writeBuffer[8];
 
    /* always place the SNSS tag in this field */
-   memcpy (&writeBuffer[0], "SNSS", 4);
+   memcpy(&writeBuffer[0], "SNSS", 4);
    tempInt = swap32 (snssFile->headerBlock.numberOfBlocks);
    writeBuffer[4] = ((char *) &tempInt)[0];
    writeBuffer[5] = ((char *) &tempInt)[1];
