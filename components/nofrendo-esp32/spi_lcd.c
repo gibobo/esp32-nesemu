@@ -24,16 +24,16 @@
 #include "soc/spi_reg.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "esp_private/periph_ctrl.h"
+#include "driver/periph_ctrl.h"
 #include "spi_lcd.h"
 
-#define PIN_NUM_MISO CONFIG_HW_LCD_MISO_GPIO
 #define PIN_NUM_MOSI CONFIG_HW_LCD_MOSI_GPIO
 #define PIN_NUM_CLK  CONFIG_HW_LCD_CLK_GPIO
 #define PIN_NUM_CS   CONFIG_HW_LCD_CS_GPIO
 #define PIN_NUM_DC   CONFIG_HW_LCD_DC_GPIO
 #define PIN_NUM_RST  CONFIG_HW_LCD_RESET_GPIO
 #define PIN_NUM_BCKL CONFIG_HW_LCD_BL_GPIO
+
 #define LCD_SEL_CMD()   GPIO.out_w1tc = (1 << PIN_NUM_DC) // Low to send command 
 #define LCD_SEL_DATA()  GPIO.out_w1ts = (1 << PIN_NUM_DC) // High to send data
 #define LCD_RST_SET()   GPIO.out_w1ts = (1 << PIN_NUM_RST) 
@@ -298,10 +298,10 @@ static void  ILI9341_INITIAL ()
 
 static void ili_gpio_init()
 {
-    PIN_FUNC_SELECT(PERIPHS_IO_MUX_GPIO21_U,2);   //DC PIN
-    PIN_FUNC_SELECT(PERIPHS_IO_MUX_GPIO18_U,2);   //RESET PIN
-    PIN_FUNC_SELECT(PERIPHS_IO_MUX_GPIO5_U,2);    //BKL PIN
-    WRITE_PERI_REG(GPIO_ENABLE_W1TS_REG, BIT21|BIT18|BIT5);
+    PIN_FUNC_SELECT(GPIO_PIN_MUX_REG[PIN_NUM_DC], PIN_FUNC_GPIO);   // DC
+    PIN_FUNC_SELECT(GPIO_PIN_MUX_REG[PIN_NUM_RST], PIN_FUNC_GPIO);  // RESET
+    PIN_FUNC_SELECT(GPIO_PIN_MUX_REG[PIN_NUM_BCKL], PIN_FUNC_GPIO); // LED
+    WRITE_PERI_REG(GPIO_ENABLE_W1TS_REG, BIT(PIN_NUM_DC) | BIT(PIN_NUM_RST) | BIT(PIN_NUM_BCKL));
 }
 
 static void spi_master_init()
@@ -310,19 +310,11 @@ static void spi_master_init()
     periph_module_enable(PERIPH_SPI_DMA_MODULE);
 
     ets_printf("lcd spi pin mux init ...\r\n");
-    PIN_FUNC_SELECT(PERIPHS_IO_MUX_GPIO19_U,2);
-    PIN_FUNC_SELECT(PERIPHS_IO_MUX_GPIO23_U,2);
-    PIN_FUNC_SELECT(PERIPHS_IO_MUX_GPIO22_U,2);
-    PIN_FUNC_SELECT(PERIPHS_IO_MUX_GPIO25_U,2);
-    WRITE_PERI_REG(GPIO_ENABLE_W1TS_REG, BIT19|BIT23|BIT22);
-
-    ets_printf("lcd spi signal init\r\n");
-    gpio_matrix_in(PIN_NUM_MISO, VSPIQ_IN_IDX,0);
-    gpio_matrix_out(PIN_NUM_MOSI, VSPID_OUT_IDX,0,0);
-    gpio_matrix_out(PIN_NUM_CLK, VSPICLK_OUT_IDX,0,0);
-    gpio_matrix_out(PIN_NUM_CS, VSPICS0_OUT_IDX,0,0);
+    PIN_FUNC_SELECT(GPIO_PIN_MUX_REG[PIN_NUM_MOSI], 1);     // MOSI, VSPID
+    PIN_FUNC_SELECT(GPIO_PIN_MUX_REG[PIN_NUM_CLK], 1);      // CLK, VSPICLK
+    PIN_FUNC_SELECT(GPIO_PIN_MUX_REG[PIN_NUM_CS], 1);       // CS, VSPICS0
+    
     ets_printf("Hspi config\r\n");
-
     CLEAR_PERI_REG_MASK(SPI_SLAVE_REG(SPI_NUM), SPI_TRANS_DONE << 5);
     SET_PERI_REG_MASK(SPI_USER_REG(SPI_NUM), SPI_CS_SETUP);
     CLEAR_PERI_REG_MASK(SPI_PIN_REG(SPI_NUM), SPI_CK_IDLE_EDGE);

@@ -37,12 +37,11 @@
 #include <stdint.h>
 #include "driver/i2s.h"
 #include "sdkconfig.h"
-#include <spi_lcd.h>
+#include "spi_lcd.h"
+#include "psxcontroller.h"
 
-#include <psxcontroller.h>
-
-#define  DEFAULT_SAMPLERATE   22100
-#define  DEFAULT_FRAGSIZE     128
+#define  DEFAULT_SAMPLERATE   24000
+#define  DEFAULT_FRAGSIZE     60
 
 #define  DEFAULT_WIDTH        256
 #define  DEFAULT_HEIGHT       NES_VISIBLE_HEIGHT
@@ -65,13 +64,27 @@ int osd_installtimer(int frequency, void *func, int funcsize, void *counter, int
 */
 static void (*audio_callback)(void *buffer, int length) = NULL;
 #if CONFIG_SOUND_ENA
-QueueHandle_t queue;
-static uint16_t *audio_frame;
+static uint16_t audio_frame[4 * DEFAULT_FRAGSIZE];
+static i2s_config_t audio_cfg = {
+	.mode = (I2S_MODE_TX | I2S_MODE_MASTER),
+	.sample_rate = DEFAULT_SAMPLERATE,
+	.bits_per_sample = I2S_BITS_PER_SAMPLE_16BIT,
+	.channel_format = I2S_CHANNEL_FMT_RIGHT_LEFT,
+	.communication_format = (I2S_COMM_FORMAT_PCM | I2S_COMM_FORMAT_I2S_MSB),
+	.intr_alloc_flags = 0,
+	.dma_buf_count = 6,
+	.dma_buf_len = 4 * DEFAULT_FRAGSIZE,
+	.use_apll = false};
+static i2s_pin_config_t pin_config = {
+	.bck_io_num = GPIO_NUM_26,
+	.ws_io_num = GPIO_NUM_25,
+	.data_out_num = GPIO_NUM_27,
+	.data_in_num = I2S_PIN_NO_CHANGE};
 #endif
 
 static void do_audio_frame() {
-
 #if CONFIG_SOUND_ENA
+	size_t i2s_bytes_write;
 	int left=DEFAULT_SAMPLERATE/NES_REFRESH_RATE;
 	while(left) {
 		int n=DEFAULT_FRAGSIZE;
@@ -79,11 +92,12 @@ static void do_audio_frame() {
 		audio_callback(audio_frame, n); //get more data
 		//16 bit mono -> 32-bit (16 bit r+l)
 		for (int i=n-1; i>=0; i--) {
-			audio_frame[i*2+1]=audio_frame[i];
-			audio_frame[i*2]=audio_frame[i];
+			uint16_t a = (audio_frame[i] >> 0);
+			audio_frame[i * 2 + 1] = 0x8000 + a;
+			audio_frame[i * 2] = 0x8000 - a;
 		}
-		i2s_write_bytes(0, audio_frame, 4*n, portMAX_DELAY);
-		left-=n;
+    	i2s_write(I2S_NUM_0, (const char *)audio_frame, 4 * n, &i2s_bytes_write, portMAX_DELAY);
+		left -= (i2s_bytes_write / 4);
 	}
 #endif
 }
@@ -103,26 +117,8 @@ static void osd_stopsound(void)
 static int osd_init_sound(void)
 {
 #if CONFIG_SOUND_ENA
-	audio_frame=malloc(4*DEFAULT_FRAGSIZE);
-	i2s_config_t cfg={
-		.mode=I2S_MODE_DAC_BUILT_IN|I2S_MODE_TX|I2S_MODE_MASTER,
-		.sample_rate=DEFAULT_SAMPLERATE,
-		.bits_per_sample=I2S_BITS_PER_SAMPLE_16BIT,
-		.channel_format=I2S_CHANNEL_FMT_RIGHT_LEFT,
-		.communication_format=I2S_COMM_FORMAT_I2S_MSB,
-		.intr_alloc_flags=0,
-		.dma_buf_count=4,
-		.dma_buf_len=512
-	};
-	i2s_driver_install(0, &cfg, 4, &queue);
-	i2s_set_pin(0, NULL);
-	i2s_set_dac_mode(I2S_DAC_CHANNEL_LEFT_EN); 
-
-	//I2S enables *both* DAC channels; we only need DAC1.
-	//ToDo: still needed now I2S supports set_dac_mode?
-	CLEAR_PERI_REG_MASK(RTC_IO_PAD_DAC1_REG, RTC_IO_PDAC1_DAC_XPD_FORCE_M);
-	CLEAR_PERI_REG_MASK(RTC_IO_PAD_DAC1_REG, RTC_IO_PDAC1_XPD_DAC_M);
-
+	i2s_driver_install(I2S_NUM_0, &audio_cfg, 0, NULL);
+	i2s_set_pin(I2S_NUM_0, &pin_config);
 #endif
 
 	audio_callback = NULL;
@@ -270,8 +266,10 @@ static void osd_initinput()
 void osd_getinput(void)
 {
 	const int ev[16]={
-			event_joypad1_select,0,0,event_joypad1_start,event_joypad1_up,event_joypad1_right,event_joypad1_down,event_joypad1_left,
-			0,0,0,0,event_soft_reset,event_joypad1_a,event_joypad1_b,event_hard_reset
+			event_joypad1_select,event_soft_reset,event_hard_reset,event_joypad1_start,
+			event_joypad1_up,event_joypad1_right,event_joypad1_down,event_joypad1_left,
+			0,0,0,0,
+			event_joypad1_b,event_joypad1_a,event_joypad1_b,event_joypad1_a
 		};
 	static int oldb=0xffff;
 	int b=psxReadInput();

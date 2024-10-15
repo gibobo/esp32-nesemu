@@ -2,7 +2,7 @@ menu "Nofrendo ESP32-specific configuration"
 
 choice NOFRENDO_HARDWARE
 	prompt "Hardware to run on"
-	default ESP_WROVER_KIT_V2_ILI
+	default HW_CUSTOM
 	help
 		This emulator can run on various types of hardware. Select what you have here.
 
@@ -12,6 +12,9 @@ config HW_WROVERKIT_V1
 config HW_WROVERKIT_V2
 	bool "ESP_Wrover_Kit v2 (black PCB)"
 
+config HW_WROOMKIT
+	bool "ESP_Wroom_Kit"
+
 config HW_CUSTOM
 	bool "Custom hardware"
 
@@ -19,7 +22,7 @@ endchoice
 
 choice HW_LCD_TYPE_SEL
 	prompt "LCD type"
-	depends on HW_CUSTOM || HW_WROVERKIT_V2
+	depends on HW_CUSTOM || HW_WROVERKIT_V2 || HW_WROOMKIT
 
 config HW_LCD_TYPE_ILI
 	bool "ILI9341 LCD"
@@ -34,6 +37,7 @@ config HW_WROVERKIT
 	default n if HW_CUSTOM
 	default y if HW_WROVERKIT_V1
 	default y if HW_WROVERKIT_V2
+	default n if HW_WROOMKIT
 
 
 config HW_LCD_TYPE
@@ -41,12 +45,6 @@ config HW_LCD_TYPE
 	default 0 if HW_WROVERKIT_V1
 	default 0 if HW_LCD_TYPE_ILI
 	default 1 if HW_LCD_TYPE_ST
-
-config HW_LCD_MISO_GPIO_CUST
-	int "LCD MISO pin"
-	depends on HW_CUSTOM
-	range 1 35
-	default 25
 
 config HW_LCD_MOSI_GPIO_CUST
 	int "LCD MOSI pin"
@@ -89,47 +87,48 @@ config HW_INV_BL_CUST
 	default n
 	depends on HW_CUSTOM
 
-
 config HW_INV_BL
 	bool
 	default HW_INBV_BL_CUST if HW_CUSTOM
 	default n if HW_WROVERKIT_V1
 	default y if HW_WROVERKIT_V2
-
-config HW_LCD_MISO_GPIO
-	int
-	default HW_LCD_MISO_GPIO_CUST if HW_CUSTOM
-	default 25 if HW_WROVERKIT
+	default n if HW_WROOMKIT
 
 config HW_LCD_MOSI_GPIO
 	int
 	default HW_LCD_MOSI_GPIO_CUST if HW_CUSTOM
 	default 23 if HW_WROVERKIT
+	default 23 if HW_WROOMKIT
 
 config HW_LCD_CLK_GPIO
 	int
 	default HW_LCD_CLK_GPIO_CUST if HW_CUSTOM
 	default 19 if HW_WROVERKIT
+	default 18 if HW_WROOMKIT
 
 config HW_LCD_CS_GPIO
 	int
 	default HW_LCD_CS_GPIO_CUST if HW_CUSTOM
 	default 22 if HW_WROVERKIT
+	default 5 if HW_WROOMKIT
 
 config HW_LCD_DC_GPIO
 	int
 	default HW_LCD_DC_GPIO_CUST if HW_CUSTOM
 	default 21 if HW_WROVERKIT
+	default 17 if HW_WROOMKIT
 
 config HW_LCD_RESET_GPIO
 	int
 	default HW_LCD_RESET_GPIO_CUST if HW_CUSTOM
 	default 18 if HW_WROVERKIT
+	default 3 if HW_WROOMKIT
 
 config HW_LCD_BL_GPIO
 	int
 	default HW_LCD_BL_GPIO_CUST if HW_CUSTOM
 	default 5 if HW_WROVERKIT
+	default 21 if HW_WROOMKIT
 
 
 config SOUND_ENA
@@ -150,13 +149,13 @@ config HW_PSX_CLK
 	int "PSX controller CLK GPIO pin"
 	depends on HW_PSX_ENA
 	range 1 35
-	default 14
+	default 4
 
 config HW_PSX_DAT
 	int "PSX controller DATa GPIO pin"
 	depends on HW_PSX_ENA
 	range 1 35
-	default 27
+	default 15
 
 config HW_PSX_ATT
 	int "PSX controller ATTention GPIO pin"

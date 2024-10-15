@@ -1,7 +1,7 @@
 #ifndef PSXCONTROLLER_H
 #define PSXCONTROLLER_H
 
-int psxReadInput();
+unsigned short psxReadInput();
 void psxcontrollerInit();
 
 #endif
