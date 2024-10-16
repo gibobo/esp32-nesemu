@@ -132,11 +132,55 @@ config HW_LCD_BL_GPIO
 
 
 config SOUND_ENA
-	bool "Analog audio on GPIO26"
+	bool "Enable Audio Output"
 	default n
 	help 
-		ESP32 will output 0-3.3V analog audio signal on GPIO26.
+		ESP32 will output audio signal.
 
+choice HW_DAC_TYPE_SEL
+	prompt "Sound output adopts DAC method"
+	depends on SOUND_ENA
+	default HW_EXTERNAL_DAC
+	help
+		Select DAC method.
+
+config HW_INTERNAL_DAC
+	bool "Internal DAC"
+
+config HW_EXTERNAL_DAC
+	bool "External DAC"
+
+endchoice
+
+config HW_AUDIO_INT_DAC
+	int "Audio WS GPIO pin"
+	depends on HW_INTERNAL_DAC
+	range 25 26
+	default 26
+
+config HW_AUDIO_WS
+	int "Audio WS GPIO pin"
+	depends on HW_EXTERNAL_DAC
+	help
+		[ESP32] WS <-> [DAC] LCK
+	range 1 35
+	default 13
+
+config HW_AUDIO_BCK
+	int "Audio BCK GPIO pin"
+	depends on HW_EXTERNAL_DAC
+	help
+		[ESP32] BCK <-> [DAC] BCK
+	range 1 35
+	default 14
+
+config HW_AUDIO_DOUT
+	int "Audio Data Out GPIO pin"
+	depends on HW_EXTERNAL_DAC
+	help
+		[ESP32] DataOut <-> [DAC] DIN
+	range 1 35
+	default 12
 
 config HW_PSX_ENA
 	bool "Enable PSX controller input"
