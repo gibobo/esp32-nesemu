@@ -39,13 +39,14 @@
 #include "sdkconfig.h"
 #include "spi_lcd.h"
 #include "psxcontroller.h"
+// #include "video_out.h"
+#include "CompositeColorOutput.h"
 
-#define  DEFAULT_SAMPLERATE   44100
-#define  DEFAULT_FRAGSIZE     128
+#define DEFAULT_SAMPLERATE	24000
+#define DEFAULT_FRAGSIZE	256 // max.256, default 240
 
-#define  DEFAULT_WIDTH        256
-#define  DEFAULT_HEIGHT       NES_VISIBLE_HEIGHT
-
+#define DEFAULT_WIDTH       256
+#define DEFAULT_HEIGHT      NES_VISIBLE_HEIGHT
 
 TimerHandle_t timer;
 
@@ -64,6 +65,7 @@ int osd_installtimer(int frequency, void *func, int funcsize, void *counter, int
 */
 static void (*audio_callback)(void *buffer, int length) = NULL;
 #if CONFIG_SOUND_ENA
+#define I2S_NUM I2S_NUM_1
 static uint16_t audio_frame[4 * DEFAULT_FRAGSIZE];
 static i2s_config_t audio_cfg = {
 #if defined(CONFIG_HW_EXTERNAL_DAC)
@@ -77,7 +79,7 @@ static i2s_config_t audio_cfg = {
 	.bits_per_sample = I2S_BITS_PER_SAMPLE_16BIT,
 	.channel_format = I2S_CHANNEL_FMT_RIGHT_LEFT,
 	.intr_alloc_flags = 0,
-	.dma_buf_count = 6,
+	.dma_buf_count = 2,
 	.dma_buf_len = 4 * DEFAULT_FRAGSIZE,
 	.use_apll = false};
 #endif
@@ -101,7 +103,7 @@ static void do_audio_frame() {
 			audio_frame[i * 2] = frame;
 #endif
 		}
-    	i2s_write(I2S_NUM_0, (const char *)audio_frame, 4 * n, &i2s_bytes_write, portMAX_DELAY);
+    	i2s_write(I2S_NUM, (const char *)audio_frame, 4 * n, &i2s_bytes_write, portMAX_DELAY);
 		left -= (i2s_bytes_write / 4);
 	}
 #endif
@@ -120,9 +122,9 @@ static void osd_stopsound(void)
 
 static int osd_init_sound(void)
 {
-	i2s_driver_install(I2S_NUM_0, &audio_cfg, 0, NULL);
+	i2s_driver_install(I2S_NUM, &audio_cfg, 0, NULL);
 #if defined(CONFIG_HW_INTERNAL_DAC)
-	i2s_set_pin(I2S_NUM_0, NULL);
+	i2s_set_pin(I2S_NUM, NULL);
 	i2s_set_dac_mode((CONFIG_HW_AUDIO_INT_DAC == 25) ? I2S_DAC_CHANNEL_RIGHT_EN : I2S_DAC_CHANNEL_LEFT_EN);
 #elif defined(CONFIG_HW_EXTERNAL_DAC)
 	i2s_pin_config_t pin_config = {
@@ -130,7 +132,7 @@ static int osd_init_sound(void)
 		.ws_io_num = CONFIG_HW_AUDIO_WS,
 		.data_out_num = CONFIG_HW_AUDIO_DOUT,
 		.data_in_num = I2S_PIN_NO_CHANGE};
-	i2s_set_pin(I2S_NUM_0, &pin_config);
+	i2s_set_pin(I2S_NUM, &pin_config);
 #endif
 
 	audio_callback = NULL;
@@ -149,8 +151,6 @@ void osd_getsoundinfo(sndinfo_t *info)
 */
 
 static int init(int width, int height);
-static void shutdown(void);
-static int set_mode(int width, int height);
 static void set_palette(rgb_t *pal);
 static void clear(uint8 color);
 static bitmap_t *lock_write(void);
@@ -160,20 +160,18 @@ static char fb[1]; //dummy
 
 QueueHandle_t vidQueue;
 
-viddriver_t sdlDriver =
-{
-   "Simple DirectMedia Layer",         /* name */
-   init,          /* init */
-   shutdown,      /* shutdown */
-   set_mode,      /* set_mode */
-   set_palette,   /* set_palette */
-   clear,         /* clear */
-   lock_write,    /* lock_write */
-   free_write,    /* free_write */
-   custom_blit,   /* custom_blit */
-   false          /* invalidate flag */
+viddriver_t sdlDriver = {
+	"Simple DirectMedia Layer", /* name */
+	init,						/* init */
+	NULL,						/* shutdown */
+	NULL,						/* set_mode */
+	set_palette,				/* set_palette */
+	clear,						/* clear */
+	lock_write,					/* lock_write */
+	free_write,					/* free_write */
+	custom_blit,				/* custom_blit */
+	false						/* invalidate flag */
 };
-
 
 bitmap_t *myBitmap;
 
@@ -184,43 +182,24 @@ void osd_getvideoinfo(vidinfo_t *info)
    info->driver = &sdlDriver;
 }
 
-/* flip between full screen and windowed */
-void osd_togglefullscreen(int code)
-{
-}
-
 /* initialise video */
 static int init(int width, int height)
 {
 	return 0;
 }
-
-static void shutdown(void)
-{
-}
-
-/* set a video mode */
-static int set_mode(int width, int height)
-{
-   return 0;
-}
-
 uint16 myPalette[256];
 
 /* copy nes palette over to hardware */
 static void set_palette(rgb_t *pal)
 {
 	uint16 c;
-
-   int i;
-
-   for (i = 0; i < 256; i++)
-   {
-      c=(pal[i].b>>3)+((pal[i].g>>2)<<5)+((pal[i].r>>3)<<11);
-      //myPalette[i]=(c>>8)|((c&0xff)<<8);
-      myPalette[i]=c;
-   }
-
+	int i;
+	for (i = 0; i < 256; i++)
+	{
+		c = (pal[i].b >> 3) + ((pal[i].g >> 2) << 5) + ((pal[i].r >> 3) << 11);
+		// myPalette[i]=(c>>8)|((c&0xff)<<8);
+		myPalette[i] = c;
+	}
 }
 
 /* clear all frames to a particular color */
@@ -228,8 +207,6 @@ static void clear(uint8 color)
 {
 //   SDL_FillRect(mySurface, 0, color);
 }
-
-
 
 /* acquire the directbuffer for writing */
 static bitmap_t *lock_write(void)
@@ -244,7 +221,6 @@ static void free_write(int num_dirties, rect_t *dirty_rects)
 {
    bmp_destroy(&myBitmap);
 }
-
 
 static void custom_blit(bitmap_t *bmp, int num_dirties, rect_t *dirty_rects) {
 	xQueueSend(vidQueue, &bmp, 0);
@@ -261,6 +237,7 @@ static void videoTask(void *arg) {
     while(1) {
 //		xQueueReceive(vidQueue, &bmp, portMAX_DELAY);//skip one frame to drop to 30
 		xQueueReceive(vidQueue, &bmp, portMAX_DELAY);
+		_lines = bmp->line;
 		ili9341_write_frame(x, y, DEFAULT_WIDTH, DEFAULT_HEIGHT, (const uint8_t **)bmp->line);
 	}
 }
@@ -336,8 +313,10 @@ int osd_init()
 		return -1;
 
 	ili9341_init();
-	ili9341_write_frame(0,0,320,240,NULL);
-	vidQueue=xQueueCreate(1, sizeof(bitmap_t *));
+	ili9341_write_frame(0, 0, 320, 240, NULL);
+	// video_init(4, EMU_NES, NULL, 1);
+	video_init(STANDARD_NTSC);
+	vidQueue = xQueueCreate(1, sizeof(bitmap_t *));
 	xTaskCreatePinnedToCore(&videoTask, "videoTask", 2048, NULL, 5, NULL, 1);
 	osd_initinput();
 	return 0;
