@@ -30,6 +30,12 @@ config HW_LCD_TYPE_ILI
 config HW_LCD_TYPE_ST
 	bool "ST7789V LCD"
 
+config HW_COMPOSITE_VIDEO_NTSC
+	bool "Composite Video (NTSC)"
+
+config HW_COMPOSITE_VIDEO_PAL
+	bool "Composite Video (PAL)"
+
 endchoice
 
 config HW_WROVERKIT
@@ -151,12 +157,6 @@ config HW_EXTERNAL_DAC
 	bool "External DAC"
 
 endchoice
-
-config HW_AUDIO_INT_DAC
-	int "Audio WS GPIO pin"
-	depends on HW_INTERNAL_DAC
-	range 25 26
-	default 26
 
 config HW_AUDIO_WS
 	int "Audio WS GPIO pin"

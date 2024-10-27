@@ -125,7 +125,7 @@ static int osd_init_sound(void)
 	i2s_driver_install(I2S_NUM, &audio_cfg, 0, NULL);
 #if defined(CONFIG_HW_INTERNAL_DAC)
 	i2s_set_pin(I2S_NUM, NULL);
-	i2s_set_dac_mode((CONFIG_HW_AUDIO_INT_DAC == 25) ? I2S_DAC_CHANNEL_RIGHT_EN : I2S_DAC_CHANNEL_LEFT_EN);
+	i2s_set_dac_mode(I2S_DAC_CHANNEL_LEFT_EN);
 #elif defined(CONFIG_HW_EXTERNAL_DAC)
 	i2s_pin_config_t pin_config = {
 		.bck_io_num = CONFIG_HW_AUDIO_BCK,
@@ -237,8 +237,11 @@ static void videoTask(void *arg) {
     while(1) {
 //		xQueueReceive(vidQueue, &bmp, portMAX_DELAY);//skip one frame to drop to 30
 		xQueueReceive(vidQueue, &bmp, portMAX_DELAY);
+#if defined(CONFIG_HW_COMPOSITE_VIDEO_NTSC) || defined(CONFIG_HW_COMPOSITE_VIDEO_PAL)
 		_lines = bmp->line;
+#elif defined(CONFIG_HW_LCD_TYPE)
 		ili9341_write_frame(x, y, DEFAULT_WIDTH, DEFAULT_HEIGHT, (const uint8_t **)bmp->line);
+#endif
 	}
 }
 
@@ -311,11 +314,14 @@ int osd_init()
 
 	if (osd_init_sound())
 		return -1;
-
+#if defined(CONFIG_HW_LCD_TYPE)
 	ili9341_init();
 	ili9341_write_frame(0, 0, 320, 240, NULL);
-	// video_init(4, EMU_NES, NULL, 1);
+#elif defined(CONFIG_HW_COMPOSITE_VIDEO_NTSC)
 	video_init(STANDARD_NTSC);
+#elif defined(CONFIG_HW_COMPOSITE_VIDEO_PAL)
+	video_init(STANDARD_PAL);
+#endif
 	vidQueue = xQueueCreate(1, sizeof(bitmap_t *));
 	xTaskCreatePinnedToCore(&videoTask, "videoTask", 2048, NULL, 5, NULL, 1);
 	osd_initinput();
