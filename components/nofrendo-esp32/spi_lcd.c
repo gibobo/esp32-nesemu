@@ -12,20 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <string.h>
-#include <stdio.h>
-#include "sdkconfig.h"
+#include "spi_lcd.h"
+#include "driver/periph_ctrl.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 #include "rom/ets_sys.h"
 #include "rom/gpio.h"
+#include "sdkconfig.h"
+#include "soc/gpio_periph.h"
 #include "soc/gpio_reg.h"
 #include "soc/gpio_sig_map.h"
 #include "soc/gpio_struct.h"
 #include "soc/io_mux_reg.h"
 #include "soc/spi_reg.h"
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-#include "driver/periph_ctrl.h"
-#include "spi_lcd.h"
+#include <stdio.h>
+#include <string.h>
 
 #define PIN_NUM_MOSI CONFIG_HW_LCD_MOSI_GPIO
 #define PIN_NUM_CLK  CONFIG_HW_LCD_CLK_GPIO

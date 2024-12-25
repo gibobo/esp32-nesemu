@@ -26,6 +26,8 @@
 #ifndef  _MEMGUARD_H_
 #define  _MEMGUARD_H_
 
+#include <esp_heap_caps.h>
+
 #ifdef strdup
 #undef strdup
 #endif

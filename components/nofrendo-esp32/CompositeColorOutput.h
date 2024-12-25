@@ -398,7 +398,7 @@ void IRAM_ATTR burst(uint16_t *line)
         burst_ntsc(line);
 }
 
-void IRAM_ATTR sync(uint16_t *line, int syncwidth)
+void IRAM_ATTR line_sync(uint16_t *line, int syncwidth)
 {
     for (int i = 0; i < syncwidth; i++)
         line[i] = SYNC_LEVEL;
@@ -407,7 +407,7 @@ void IRAM_ATTR sync(uint16_t *line, int syncwidth)
 void IRAM_ATTR blanking(uint16_t *line, bool vbl)
 {
     int syncwidth = vbl ? _hsync_long : _hsync;
-    sync(line, syncwidth);
+    line_sync(line, syncwidth);
     for (int i = syncwidth; i < _line_width; i++)
         line[i] = BLANKING_LEVEL;
     if (!vbl)
@@ -438,7 +438,7 @@ extern "C"
             }
             else if (i < _active_lines + 32)
             { // active video 32-272
-                sync(buf, _hsync);
+                line_sync(buf, _hsync);
                 burst(buf);
                 blit(_lines[i - 32], buf + _active_start);
             }
@@ -457,7 +457,7 @@ extern "C"
             // ntsc
             if (i < _active_lines)
             { // active video
-                sync(buf, _hsync);
+                line_sync(buf, _hsync);
                 burst(buf);
                 blit(_lines[i], buf + _active_start);
             }
