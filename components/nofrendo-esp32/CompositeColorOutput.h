@@ -20,9 +20,10 @@
 
 #include "esp_heap_caps.h"
 #include "rom/lldesc.h"
-#include "driver/periph_ctrl.h"
+#include "esp_private/periph_ctrl.h"
 #include "driver/dac.h"
 #include "driver/i2s.h"
+#include "soc/i2s_struct.h"
 #include "soc/rtc.h"
 #include <math.h>
 #include "palette.h"
@@ -283,12 +284,12 @@ void ntsc_init()
 // draw a line of game in NTSC
 void IRAM_ATTR blit_ntsc(uint8_t *src, uint16_t *dst)
 {
-    uint32_t *d = (uint32_t *)dst;
     uint32_t *p;
     uint32_t color, c;
     uint32_t mask = 0xFF;
     int i;
 #ifdef EMU_ATARI
+    uint32_t *d = (uint32_t *)dst;
     p = atari_4_phase_ntsc
 
         // 2 pixels per color clock, 4 samples per cc, used by atari
@@ -559,20 +560,23 @@ static esp_err_t start_dma(int line_width, int samples_per_cc)
         switch (samples_per_cc)
         {
         case 3:
-            rtc_clk_apll_enable(true, 0x46, 0x97, 0x4, 2);
-            break; // 10.7386363636 3x NTSC (10.7386398315mhz)
+            rtc_clk_apll_coeff_set(2, 0x46, 0x97, 0x4);// 10.7386363636 3x NTSC (10.7386398315mhz)
+            rtc_clk_apll_enable(true);
+            break;
         case 4:
-            rtc_clk_apll_enable(true, 0x46, 0x97, 0x4, 1);
-            break; // 14.3181818182 4x NTSC (14.3181864421mhz)
+            rtc_clk_apll_coeff_set(1, 0x46, 0x97, 0x4); // 14.3181818182 4x NTSC (14.3181864421mhz)
+            rtc_clk_apll_enable(true);
+            break;
         }
     }
     else
     {
-        rtc_clk_apll_enable(true, 0x04, 0xA4, 0x6, 1); // 17.734476mhz ~4x PAL
+        rtc_clk_apll_coeff_set(1, 0x04, 0xA4, 0x6); // 17.734476mhz ~4x PAL
+        rtc_clk_apll_enable(true);
     }
 
-    dac_output_enable(DAC_CHANNEL_1); // DAC1, right channel, GPIO25
-    // dac_output_enable(DAC_CHANNEL_2); // DAC2, left channel, GPIO26
+    dac_output_enable(DAC_CHAN_0); // DAC1, right channel, GPIO25
+    // dac_output_enable(DAC_CHAN_1); // DAC2, left channel, GPIO26
     dac_i2s_enable();
 
     // start DMA!

@@ -162,7 +162,7 @@ static esp_err_t start_dma(int line_width, int samples_per_cc)
         rtc_clk_apll_enable(1, 0x04, 0xA4, 0x6, 1); // 17.734476mhz ~4x PAL
     }
 
-    dac_output_enable(DAC_CHANNEL_1); // DAC, video on GPIO25
+    dac_output_enable(DAC_CHAN_0); // DAC, video on GPIO25
     dac_i2s_enable();                 // start DAC!
 
     I2S0.conf.tx_start = 1; // start DMA!

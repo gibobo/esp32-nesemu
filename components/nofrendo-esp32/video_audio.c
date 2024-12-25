@@ -122,6 +122,7 @@ static void osd_stopsound(void)
 
 static int osd_init_sound(void)
 {
+#if CONFIG_SOUND_ENA
 	i2s_driver_install(I2S_NUM, &audio_cfg, 0, NULL);
 #if defined(CONFIG_HW_INTERNAL_DAC)
 	i2s_set_pin(I2S_NUM, NULL);
@@ -133,6 +134,7 @@ static int osd_init_sound(void)
 		.data_out_num = CONFIG_HW_AUDIO_DOUT,
 		.data_in_num = I2S_PIN_NO_CHANGE};
 	i2s_set_pin(I2S_NUM, &pin_config);
+#endif
 #endif
 
 	audio_callback = NULL;
