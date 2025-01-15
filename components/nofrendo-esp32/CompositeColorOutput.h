@@ -23,6 +23,7 @@
 #include "driver/periph_ctrl.h"
 #include "driver/dac.h"
 #include "driver/i2s.h"
+#include "soc/i2s_struct.h"
 #include "soc/rtc.h"
 #include <math.h>
 #include "palette.h"
@@ -283,12 +284,12 @@ void ntsc_init()
 // draw a line of game in NTSC
 void IRAM_ATTR blit_ntsc(uint8_t *src, uint16_t *dst)
 {
-    uint32_t *d = (uint32_t *)dst;
     uint32_t *p;
     uint32_t color, c;
     uint32_t mask = 0xFF;
     int i;
 #ifdef EMU_ATARI
+    uint32_t *d = (uint32_t *)dst;
     p = atari_4_phase_ntsc
 
         // 2 pixels per color clock, 4 samples per cc, used by atari
