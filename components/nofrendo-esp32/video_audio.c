@@ -20,8 +20,6 @@
 #undef false
 #undef true
 #undef bool
-
-
 #include <math.h>
 #include <string.h>
 #include <noftypes.h>
@@ -102,7 +100,7 @@ static void do_audio_frame() {
 			audio_frame[i * 2] = frame;
 #endif
 		}
-    	i2s_write(I2S_NUM, (const char *)audio_frame, 4 * n, &i2s_bytes_write, portMAX_DELAY);
+		i2s_write(I2S_NUM, (const char *)audio_frame, 4 * n, &i2s_bytes_write, portMAX_DELAY);
 		left -= (i2s_bytes_write / 4);
 	}
 #endif
@@ -206,13 +204,11 @@ static void set_palette(rgb_t *pal)
 /* clear all frames to a particular color */
 static void clear(uint8 color)
 {
-//   SDL_FillRect(mySurface, 0, color);
 }
 
 /* acquire the directbuffer for writing */
 static bitmap_t *lock_write(void)
 {
-//   SDL_LockSurface(mySurface);
    myBitmap = bmp_createhw((uint8*)fb, DEFAULT_WIDTH, DEFAULT_HEIGHT, DEFAULT_WIDTH*2);
    return myBitmap;
 }
@@ -231,15 +227,12 @@ static void custom_blit(bitmap_t *bmp, int num_dirties, rect_t *dirty_rects) {
 
 //This runs on core 1.
 static void videoTask(void *arg) {
-	int x, y;
 	bitmap_t *bmp=NULL;
-	x = (320-DEFAULT_WIDTH)/2;
-    y = ((240-DEFAULT_HEIGHT)/2);
-    while(1) {
+	while(1) {
 //		xQueueReceive(vidQueue, &bmp, portMAX_DELAY);//skip one frame to drop to 30
 		xQueueReceive(vidQueue, &bmp, portMAX_DELAY);
 #if defined(CONFIG_HW_COMPOSITE_VIDEO_NTSC) || defined(CONFIG_HW_COMPOSITE_VIDEO_PAL)
-		_lines = bmp->line;
+		sendFrameHalfResolution((char ***)bmp->line);
 #elif defined(CONFIG_HW_LCD_TYPE)
 		ili9341_write_frame(x, y, DEFAULT_WIDTH, DEFAULT_HEIGHT, (const uint8_t **)bmp->line);
 #endif
@@ -318,10 +311,8 @@ int osd_init()
 #if defined(CONFIG_HW_LCD_TYPE)
 	ili9341_init();
 	ili9341_write_frame(0, 0, 320, 240, NULL);
-#elif defined(CONFIG_HW_COMPOSITE_VIDEO_NTSC)
-	video_init(STANDARD_NTSC);
-#elif defined(CONFIG_HW_COMPOSITE_VIDEO_PAL)
-	video_init(STANDARD_PAL);
+#elif defined(CONFIG_HW_COMPOSITE_VIDEO_NTSC) || defined(CONFIG_HW_COMPOSITE_VIDEO_PAL)
+	video_init();
 #endif
 	vidQueue = xQueueCreate(1, sizeof(bitmap_t *));
 	xTaskCreatePinnedToCore(&videoTask, "videoTask", 2048, NULL, 5, NULL, 1);
