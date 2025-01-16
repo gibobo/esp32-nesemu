@@ -47,7 +47,7 @@
 #define P2 (color)
 #define P3 (color << 8)
 
-uint8_t **_lines = 0;
+static uint8_t **_lines = 0;
 
 lldesc_t _dma_desc[4] = {0};
 intr_handle_t _isr_handle;
@@ -614,7 +614,7 @@ void video_init(void)
 #endif
 }
 
-void sendFrameHalfResolution(char ***frame)
+void sendFrameHalfResolution(const uint8_t **frame)
 {
-	_lines = (uint8_t **)*frame;
+	_lines = frame;
 }

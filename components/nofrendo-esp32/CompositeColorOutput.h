@@ -32,6 +32,6 @@
 // #endif
 
 void video_init(void);
-void sendFrameHalfResolution(char ***frame);
+void sendFrameHalfResolution(const uint8_t **frame);
 
 #endif /*__COMPOSITE_COLOR_OUTPUT_H__*/

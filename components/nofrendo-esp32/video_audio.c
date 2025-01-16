@@ -232,7 +232,7 @@ static void videoTask(void *arg) {
 //		xQueueReceive(vidQueue, &bmp, portMAX_DELAY);//skip one frame to drop to 30
 		xQueueReceive(vidQueue, &bmp, portMAX_DELAY);
 #if defined(CONFIG_HW_COMPOSITE_VIDEO_NTSC) || defined(CONFIG_HW_COMPOSITE_VIDEO_PAL)
-		sendFrameHalfResolution((char ***)bmp->line);
+		sendFrameHalfResolution((const uint8_t **)bmp->line);
 #elif defined(CONFIG_HW_LCD_TYPE)
 		ili9341_write_frame(x, y, DEFAULT_WIDTH, DEFAULT_HEIGHT, (const uint8_t **)bmp->line);
 #endif
