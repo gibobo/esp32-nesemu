@@ -16,31 +16,29 @@
 */
 
 #include "CompositeColorOutput.h"
-#include "esp_heap_caps.h"
-#include "rom/lldesc.h"
-#include "driver/periph_ctrl.h"
 #include "driver/dac.h"
 #include "driver/i2s.h"
-#include "soc/rtc.h"
+#include "driver/periph_ctrl.h"
+#include "esp_heap_caps.h"
 #include "palette.h"
+#include "rom/lldesc.h"
+#include "soc/rtc.h"
 #include <math.h>
 
-#define COLORBURST 1
-
 #define NTSC_COLOR_CLOCKS_PER_SCANLINE 228 // really 227.5 for NTSC but want to avoid half phase fiddling for now
-#define NTSC_FREQUENCY (315000000.f / 88.f)
+#define NTSC_FREQUENCY (315.0 / 88.0)
 #define NTSC_LINES 262
 
 #define PAL_COLOR_CLOCKS_PER_SCANLINE 284 // really 283.75 ?
-#define PAL_FREQUENCY 4433618.75
+#define PAL_FREQUENCY (4.43361875)
 #define PAL_LINES 312
 
 #define IRE(_x) ((uint32_t)(((_x) + 40) * 255 / 3.3 / 147.5) << 8) // 3.3V DAC
-#define SYNC_LEVEL IRE(-40)
-#define BLANKING_LEVEL IRE(0)
-#define BLACK_LEVEL IRE(7.5)
-#define GRAY_LEVEL IRE(50)
-#define WHITE_LEVEL IRE(100)
+#define SYNC_LEVEL 		IRE(-40)
+#define BLANKING_LEVEL	IRE(0)
+#define BLACK_LEVEL 	IRE(7.5)
+#define GRAY_LEVEL		IRE(50)
+#define WHITE_LEVEL 	IRE(100)
 
 #define P0 (color >> 16)
 #define P1 (color >> 8)
@@ -52,7 +50,6 @@ static uint8_t **_lines = 0;
 lldesc_t _dma_desc[4] = {0};
 intr_handle_t _isr_handle;
 volatile int _line_counter = 0;
-volatile int _frame_counter = 0;
 int _samples_per_cc = 4; // 3 or 4
 int _active_lines = 240;
 int _line_count;
@@ -79,61 +76,21 @@ static int usec(float us) {
 
 //===================================================================================================
 //===================================================================================================
-// Performance Testing
-#ifdef PERF
-#define BEGIN_TIMING() uint32_t t = xthal_get_ccount()
-#define END_TIMING()                           \
-	t = xthal_get_ccount() - t;                \
-	_blit_ticks_min = min(_blit_ticks_min, t); \
-	_blit_ticks_max = max(_blit_ticks_max, t);
-#define ISR_BEGIN() uint32_t t = xthal_get_ccount()
-#define ISR_END()               \
-	t = xthal_get_ccount() - t; \
-	_isr_us += (t + 120) / 240;
-uint32_t _blit_ticks_min = 0;
-uint32_t _blit_ticks_max = 0;
-uint32_t _isr_us = 0;
-void perf()
-{
-	static int _next = 0;
-	if (_drawn >= _next)
-	{
-		float elapsed_us = 120 * 1000000 / (_emu->standard ? 60 : 50);
-		_next = _drawn + 120;
-
-		printf("frame_time:%d drawn:%d displayed:%d blit_ticks:%d->%d, isr time:%2.2f%%\n",
-			   _frame_time / 240, _drawn, _frame_counter, _blit_ticks_min, _blit_ticks_max, (_isr_us * 100) / elapsed_us);
-
-		_blit_ticks_min = 0xFFFFFFFF;
-		_blit_ticks_max = 0;
-		_isr_us = 0;
-	}
-}
-#else
-#define BEGIN_TIMING()
-#define END_TIMING()
-#define ISR_BEGIN()
-#define ISR_END()
-void perf() {};
-#endif
-
-
-//===================================================================================================
-//===================================================================================================
 // PAL
 
 #if defined(SUPPORT_PAL)
 void pal_init()
 {
-	_palette = atari_4_phase_pal;
-	_sample_rate = (float)_samples_per_cc * PAL_FREQUENCY / 1000000.f; // DAC rate in mhz
-	_line_width = PAL_COLOR_CLOCKS_PER_SCANLINE * _samples_per_cc;
+    int cc_width = 4;
+	_palette = pal_palette();
+	_sample_rate = (float)cc_width * PAL_FREQUENCY; // DAC rate in mhz
+	_line_width = PAL_COLOR_CLOCKS_PER_SCANLINE * cc_width;
 	_line_count = PAL_LINES;
 	_hsync_short = usec(2.f);
 	_hsync_long = usec(30.f);
 	_hsync = usec(4.7f);
 	_burst_start = usec(5.6f);
-	_burst_width = (int)(10 * _samples_per_cc + 4) & 0xFFFE;
+	_burst_width = (int)(10 * cc_width + 4) & 0xFFFE;
 	_active_start = usec(10.4f);
 
 	// make colorburst tables for even and odd lines
@@ -142,9 +99,9 @@ void pal_init()
 	float phase = 2 * M_PI / 2;
 	for (int i = 0; i < _burst_width; i++)
 	{
-		_burst0[i] = BLANKING_LEVEL * (1 + sin(phase + 3 * M_PI / 4) * 2 / 3);
-		_burst1[i] = BLANKING_LEVEL * (1 + sin(phase - 3 * M_PI / 4) * 2 / 3);
-		phase += 2 * M_PI / _samples_per_cc;
+		_burst0[i] = BLANKING_LEVEL + sin(phase + 3 * M_PI / 4) * BLANKING_LEVEL / 1.5f;
+		_burst1[i] = BLANKING_LEVEL + sin(phase - 3 * M_PI / 4) * BLANKING_LEVEL / 1.5f;
+		phase += 2 * M_PI / cc_width;
 	}
 }
 
@@ -274,7 +231,7 @@ void IRAM_ATTR pal_sync(uint16_t *line, int i)
 void ntsc_init()
 {
 	_palette = ntsc_palette();
-	_sample_rate = 315.0f / 88.f * (float)_samples_per_cc; // DAC rate
+	_sample_rate = (float)_samples_per_cc * NTSC_FREQUENCY; // DAC rate
 	_line_width = NTSC_COLOR_CLOCKS_PER_SCANLINE * _samples_per_cc;
 	_line_count = NTSC_LINES;
 	_hsync_long = usec(63.555f - 4.7f);
@@ -387,7 +344,6 @@ void IRAM_ATTR blit_ntsc(uint8_t *src, uint16_t *dst)
 		}
 	}
 #endif
-	END_TIMING();
 }
 
 void IRAM_ATTR burst_ntsc(uint16_t *line)
@@ -399,17 +355,10 @@ void IRAM_ATTR burst_ntsc(uint16_t *line)
 		// 4 samples per color clock
 		for (i = _hsync; i < _hsync + (4 * 10); i += 4)
 		{
-#if COLORBURST
 			line[i + 1] = BLANKING_LEVEL;
-			line[i + 0] = BLANKING_LEVEL + BLANKING_LEVEL/2;
+			line[i + 0] = BLANKING_LEVEL + BLANKING_LEVEL / 2;
 			line[i + 3] = BLANKING_LEVEL;
-			line[i + 2] = BLANKING_LEVEL - BLANKING_LEVEL/2;
-#else
-			line[i + 1] = BLANKING_LEVEL;
-			line[i + 0] = BLANKING_LEVEL;
-			line[i + 3] = BLANKING_LEVEL;
-			line[i + 2] = BLANKING_LEVEL;
-#endif
+			line[i + 2] = BLANKING_LEVEL - BLANKING_LEVEL / 2;
 		}
 		break;
 	case 3:
@@ -434,13 +383,11 @@ void IRAM_ATTR burst_ntsc(uint16_t *line)
 // Common
 void IRAM_ATTR blit(uint8_t *src, uint16_t *dst)
 {
-	BEGIN_TIMING();
 #if defined(SUPPORT_PAL)
 	blit_pal(src, dst);
 #elif defined(SUPPORT_NTSC)
 	blit_ntsc(src, dst);
 #endif
-	END_TIMING();
 }
 
 void IRAM_ATTR burst(uint16_t *line)
@@ -469,16 +416,14 @@ void IRAM_ATTR blanking(uint16_t *line, bool vbl)
 }
 
 // Workhorse ISR handles audio and video updates
-void IRAM_ATTR video_isr(volatile void* vbuf)
+void IRAM_ATTR video_isr(volatile void *vbuf)
 {
 	if (!_lines)
 		return;
 
-	ISR_BEGIN();
-
 	int i = _line_counter++;
-    uint16_t* buf = (uint16_t*)vbuf;
-#if defined(SUPPORT_PAL)
+	uint16_t *buf = (uint16_t *)vbuf;
+	#if defined(SUPPORT_PAL)
 	if (i < 32) {
 		blanking(buf, false);              // pre render/black 0-32
 	} else if (i < _active_lines + 32) { // active video 32-272
@@ -505,12 +450,7 @@ void IRAM_ATTR video_isr(volatile void* vbuf)
 	}
 #endif
 
-	if (_line_counter == _line_count) {
-		_line_counter = 0; // frame is done
-		_frame_counter++;
-	}
-
-	ISR_END();
+	_line_counter %= _line_count;
 }
 
 // simple isr
@@ -525,7 +465,7 @@ static esp_err_t start_dma(int line_width, int samples_per_cc, int ch)
 	periph_module_enable(PERIPH_I2S0_MODULE);
 
 	// setup interrupt
-	if (esp_intr_alloc(ETS_I2S0_INTR_SOURCE, ESP_INTR_FLAG_LEVEL1 | ESP_INTR_FLAG_IRAM | ESP_INTR_FLAG_INTRDISABLED,
+	if (esp_intr_alloc(ETS_I2S0_INTR_SOURCE, ESP_INTR_FLAG_LEVEL1 | ESP_INTR_FLAG_IRAM,
 						i2s_intr_handler_video, 0, &_isr_handle) != ESP_OK)
 		return -1;
 
@@ -574,10 +514,9 @@ static esp_err_t start_dma(int line_width, int samples_per_cc, int ch)
 #if defined(SUPPORT_PAL)
 	rtc_clk_apll_enable(true, 0x04, 0xA4, 0x6, 1); // 17.734476mhz ~4x PAL
 #elif defined(SUPPORT_NTSC)
-	if (samples_per_cc == 3)
-		rtc_clk_apll_enable(true, 0x46, 0x97, 0x4, 2); // 10.7386363636 3x NTSC (10.7386398315mhz)
-	if (samples_per_cc == 4)
-		rtc_clk_apll_enable(true, 0x46, 0x97, 0x4, 1); // 14.3181818182 4x NTSC (14.3181864421mhz)
+	// 10.7386363636 3x NTSC (10.7386398315mhz)
+	// 14.3181818182 4x NTSC (14.3181864421mhz)
+	rtc_clk_apll_enable(true, 0x46, 0x97, 0x4, (samples_per_cc == 3) ? 2 : 1);
 #endif
 
 	I2S0.clkm_conf.clkm_div_num = 1;        // I2S clock divider’s integral value.
